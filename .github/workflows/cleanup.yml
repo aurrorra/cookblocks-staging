@@ -1,0 +1,35 @@
+name: Purge stale staging images
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Delete files older than 7 days from staging/
+        run: |
+          if [ -d staging ]; then
+            find staging/ -type f ! -name '.gitkeep' -mtime +7 -delete
+          else
+            echo "No staging/ folder yet, nothing to purge."
+          fi
+
+      - name: Commit deletions if any
+        run: |
+          git config user.name "Pin Staging Janitor"
+          git config user.email "actions@github.com"
+          git add -A staging/ || true
+          if git diff --staged --quiet; then
+            echo "Nothing to purge today."
+          else
+            git commit -m "Auto-purge: staging images older than 7 days"
+            git push
+          fi
