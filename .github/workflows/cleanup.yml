@@ -14,10 +14,12 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Delete files older than 7 days from staging/
+- name: Delete files older than 7 days from any staging subfolder
         run: |
           if [ -d staging ]; then
-            find staging/ -type f ! -name '.gitkeep' -mtime +7 -delete
+            echo "Scanning staging/ recursively for files older than 7 days..."
+            find staging/ -type f ! -name '.gitkeep' -mtime +7 -delete -print
+            echo "Scan complete."
           else
             echo "No staging/ folder yet, nothing to purge."
           fi
