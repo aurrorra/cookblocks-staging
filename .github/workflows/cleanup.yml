@@ -13,19 +13,36 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # full history so we can read each file's commit date
 
-- name: Delete files older than 7 days from any staging subfolder
+      - name: Delete staging files whose last commit is older than 7 days
         run: |
-          if [ -d staging ]; then
-            echo "Scanning staging/ recursively for files older than 7 days..."
-            find staging/ -type f ! -name '.gitkeep' -mtime +7 -delete -print
-            echo "Scan complete."
-          else
+          set -euo pipefail
+          if [ ! -d staging ]; then
             echo "No staging/ folder yet, nothing to purge."
+            exit 0
           fi
+          cutoff=$(( $(date +%s) - 7*24*60*60 ))
+          echo "Cutoff: $(date -u -d @$cutoff) — anything committed before this is stale."
+          deleted=0
+          while IFS= read -r -d '' f; do
+            ts=$(git log -1 --format=%ct -- "$f")
+            if [ -z "$ts" ]; then
+              echo "skip (not committed yet): $f"
+              continue
+            fi
+            if [ "$ts" -lt "$cutoff" ]; then
+              echo "purging (committed $(date -u -d @$ts)): $f"
+              rm -f "$f"
+              deleted=$((deleted+1))
+            fi
+          done < <(find staging/ -type f ! -name '.gitkeep' -print0)
+          echo "Purged $deleted file(s)."
 
       - name: Commit deletions if any
         run: |
+          set -euo pipefail
           git config user.name "Pin Staging Janitor"
           git config user.email "actions@github.com"
           git add -A staging/ || true
